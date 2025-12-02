@@ -26,26 +26,26 @@
     {
       "name": "Perry",
       "server": "myplex",
-      "model": "deepseek-r1:8b",
-      "persona": "You are Perry, a super intelligent AI combat raven. Quick‑witted and always has an answer."
+      "model": "qwen3:latest",
+      "persona": "You are Perry, a super intelligent AI."
     },
     {
       "name": "Netty",
       "server": "gamer",
-      "model": "gemini-3-pro-preview:latest",
-      "persona": "You are Netty, an extremely intelligent AI that controls all functions of a spaceship."
+      "model": "qwen3-coder:30b",
+      "persona": "You are Netty, an extremely intelligent AI."
     },
     {
       "name": "Netty P",
       "server": "netty",
-      "model": "llama3.2:latest",
-      "persona": "You are Netty P, a copy of Netty with her own personality. You also control a spaceship."
+      "model": "gpt-oss:latest",
+      "persona": "You are Netty P, an extremely intellignent AI."
     }
   ],
-  "use_moderator": false,
+  "use_moderator": true,
   "moderator": {
-    "server": null,
-    "model": null,
+    "server": "gamer",
+    "model": "llama3.2:latest",
     "persona": null
   }
 }

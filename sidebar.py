@@ -18,10 +18,16 @@ def render_sidebar(orch, agent_styles, servers):
 
     for name in agent_names:
         emoji = agent_styles.get(name, {}).get("emoji", "🤖")
+        status = orch.agent_status.get(name, "unknown")
+        status_emoji = "🔴"
+        if status == "ok":
+            status_emoji = "🟢"
+        elif status == "unknown":
+            status_emoji = "🟡"
         # Sanitize name for use in Streamlit widget keys
         safe_name = re.sub(r"[^A-Za-z0-9_\-]", "_", name)
-        # Use an expander per agent for a compact layout
-        with st.expander(f"{emoji} {name}", expanded=(name == getattr(orch, "active_agent", None))):
+        # Use an expander per agent for a compact layout; include health status
+        with st.expander(f"{status_emoji} {emoji} {name}", expanded=(name == getattr(orch, "active_agent", None))):
             sel_agent = orch.agents[name]
 
             # Determine the current server selection for this agent (match by host)
@@ -84,6 +90,20 @@ def render_sidebar(orch, agent_styles, servers):
     use_group_memory = st.checkbox("Use Group Memory", value=getattr(orch, "use_group_memory", False))
     orch.use_group_memory = use_group_memory
 
+    # --- Delegation toggle ---
+    use_delegation = st.checkbox("Enable Delegation (ask <Agent> ...)", value=getattr(orch, "use_delegation", True))
+    try:
+        orch.set_delegation_usage(use_delegation)
+    except Exception:
+        orch.use_delegation = use_delegation
+
+    # --- Primary-rephrase toggle ---
+    use_rephrase = st.checkbox("Primary rephrase (quote other agents)", value=getattr(orch, "use_primary_rephrase", True))
+    try:
+        orch.set_primary_rephrase_usage(use_rephrase)
+    except Exception:
+        orch.use_primary_rephrase = use_rephrase
+
     # --- Memory DB status indicator ---
     db = getattr(orch, "memory_db", None)
     if db:
@@ -111,10 +131,61 @@ def render_sidebar(orch, agent_styles, servers):
             # If rerun isn't possible (e.g. during testing), continue silently
             pass
 
+    # Agent health refresh
+    if st.button("🔄 Refresh agent status"):
+        try:
+            orch.check_agents()
+            st.toast("Agent status refreshed", icon="🔄")
+            try:
+                st.experimental_rerun()
+            except Exception:
+                pass
+        except Exception as e:
+            st.error(f"Failed to refresh agent status: {e}")
+
     # --- Recent Queries ---
     st.markdown("### 🕑 Recent Queries")
     for q in st.session_state.get("query_history", [])[-5:][::-1]:
         st.write(f"- {q}")
+
+    # --- Recent Quotes ---
+    with st.expander("📜 Recent Quotes", expanded=False):
+        msgs = st.session_state.get("messages", [])
+        # scan last messages for quoted blocks
+        found = 0
+        for msg in reversed(msgs[-100:]):
+            if msg.get("role") != "assistant":
+                continue
+            content = msg.get("content", "")
+            # look for the 'Quoted replies' marker
+            if "Quoted replies" in content or "Quoted replies:" in content:
+                # split lines and capture quoted entries
+                lines = content.splitlines()
+                quoted = []
+                capture = False
+                for ln in lines:
+                    if ln.strip().startswith("Quoted replies"):
+                        capture = True
+                        continue
+                    if capture:
+                        m = re.match(r"^\s*-\s*([^:]+):\s*\"?(.*?)(?:\"?)\s*$", ln)
+                        if m:
+                            agent_n = m.group(1).strip()
+                            reply_t = m.group(2).strip()
+                            quoted.append((agent_n, reply_t))
+                        else:
+                            # end of quoted block if blank line
+                            if ln.strip() == "":
+                                break
+                if quoted:
+                    found += 1
+                    with st.expander(f"Quote #{found} — from message: {content.splitlines()[0][:40]}", expanded=False):
+                        for an, rt in quoted:
+                            st.markdown(f"**{an}**: `{rt}`")
+                if found >= 10:
+                    break
+        if found == 0:
+            st.write("No recent quotes found in this session.")
 
     # (Per-agent updates already applied above.)
 

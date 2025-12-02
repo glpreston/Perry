@@ -1,5 +1,6 @@
 import sys
 from pathlib import Path
+import logging
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from memory import MemoryDB
 
@@ -8,39 +9,40 @@ GROUP_KEY = '__group__'
 
 if __name__ == '__main__':
     db = MemoryDB()
+    logger = logging.getLogger(__name__)
     try:
-        print('MemoryDB connected:', db.is_connected())
+        logger.info('MemoryDB connected: %s', db.is_connected())
     except Exception as e:
-        print('DB connect check failed:', e)
+        logger.exception('DB connect check failed: %s', e)
     try:
-        print('\nRecent QA for agent:', AGENT)
+        logger.info('\nRecent QA for agent: %s', AGENT)
         qa = db.load_recent_qa(AGENT, limit=10)
         if not qa:
-            print('  (no QA entries)')
+            logger.info('  (no QA entries)')
         else:
                 for item in qa:
-                    print('---')
-                    print('Q:', item.get('q'))
-                    print('A:', item.get('a'))
+                    logger.info('---')
+                    logger.info('Q: %s', item.get('q'))
+                    logger.info('A: %s', item.get('a'))
                     # Attempt to show conv_id if present in the row dict
                     if 'conv_id' in item:
-                        print('conv_id:', item.get('conv_id'))
-                    print('TS:', item.get('ts'))
+                        logger.info('conv_id: %s', item.get('conv_id'))
+                    logger.info('TS: %s', item.get('ts'))
 
-        print('\nRecent group QA (', GROUP_KEY, '):')
+        logger.info('\nRecent group QA (%s):', GROUP_KEY)
         gqa = db.load_recent_qa(None, limit=10)
         if not gqa:
-            print('  (no group QA entries)')
+            logger.info('  (no group QA entries)')
         else:
             for item in gqa:
-                print('---')
-                print('Q:', item.get('q'))
-                print('A:', item.get('a'))
+                logger.info('---')
+                logger.info('Q: %s', item.get('q'))
+                logger.info('A: %s', item.get('a'))
                 if 'conv_id' in item:
-                    print('conv_id:', item.get('conv_id'))
-                print('TS:', item.get('ts'))
+                    logger.info('conv_id: %s', item.get('conv_id'))
+                logger.info('TS: %s', item.get('ts'))
     except Exception as e:
-        print('Error querying QA:', e)
+        logger.exception('Error querying QA: %s', e)
     finally:
         try:
             db.close()
