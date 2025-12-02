@@ -206,54 +206,53 @@ def render_sidebar(orch, agent_styles, servers):
 
     # --- Clear All Memories (destructive) ---
     if db:
-        st.markdown("---")
-        st.markdown("### ⚠️ Clear All Memories (destructive)")
-        st.write("This will permanently delete all rows from the `agent_memory` table for all agents and group memory.")
-        st.write("Strongly recommended: export your memories before running this.")
-        export_before = st.checkbox("Export all memories before clearing", value=True, key="export_all_before_clear")
+        with st.expander("⚠️ Clear All Memories (destructive)", expanded=False):
+            st.write("This will permanently delete all rows from the `agent_memory` table for all agents and group memory.")
+            st.write("Strongly recommended: export your memories before running this.")
+            export_before = st.checkbox("Export all memories before clearing", value=True, key="export_all_before_clear")
 
-        if export_before and st.button("Prepare full export", key="prepare_full_export"):
-            try:
-                # Attempt to read all rows from the table
-                rows = db._try_execute("SELECT agent_name, question, answer, conv_id, timestamp FROM agent_memory ORDER BY timestamp DESC LIMIT 100000", (), fetch=True)
-                if not rows:
-                    st.info("No rows found to export.")
-                else:
-                    # Convert to CSV in-memory
-                    import io, csv
-                    buf = io.StringIO()
-                    writer = csv.writer(buf)
-                    writer.writerow(['agent_name', 'question', 'answer', 'conv_id', 'timestamp'])
-                    for agent_name, q, a, conv_id, ts in rows:
-                        writer.writerow([agent_name or '', q or '', a or '', conv_id or '', ts or ''])
-                    data = buf.getvalue().encode('utf-8')
-                    fname = f"all_memories_export_{datetime.datetime.utcnow().strftime('%Y%m%dT%H%M%SZ')}.csv"
-                    st.download_button("Download full export", data, file_name=fname, mime='text/csv')
-            except Exception as e:
-                st.error(f"Failed to prepare full export: {e}")
+            if export_before and st.button("Prepare full export", key="prepare_full_export"):
+                try:
+                    # Attempt to read all rows from the table
+                    rows = db._try_execute("SELECT agent_name, question, answer, conv_id, timestamp FROM agent_memory ORDER BY timestamp DESC LIMIT 100000", (), fetch=True)
+                    if not rows:
+                        st.info("No rows found to export.")
+                    else:
+                        # Convert to CSV in-memory
+                        import io, csv
+                        buf = io.StringIO()
+                        writer = csv.writer(buf)
+                        writer.writerow(['agent_name', 'question', 'answer', 'conv_id', 'timestamp'])
+                        for agent_name, q, a, conv_id, ts in rows:
+                            writer.writerow([agent_name or '', q or '', a or '', conv_id or '', ts or ''])
+                        data = buf.getvalue().encode('utf-8')
+                        fname = f"all_memories_export_{datetime.datetime.utcnow().strftime('%Y%m%dT%H%M%SZ')}.csv"
+                        st.download_button("Download full export", data, file_name=fname, mime='text/csv')
+                except Exception as e:
+                    st.error(f"Failed to prepare full export: {e}")
 
-        clear_all_flag = st.session_state.get('confirm_clear_all', False)
-        if st.button("Clear ALL memories (permanent)", key="clear_all_btn"):
-            st.session_state['confirm_clear_all'] = True
+            clear_all_flag = st.session_state.get('confirm_clear_all', False)
+            if st.button("Clear ALL memories (permanent)", key="clear_all_btn"):
+                st.session_state['confirm_clear_all'] = True
 
-        if st.session_state.get('confirm_clear_all', False):
-            st.warning("This will PERMANENTLY delete ALL memories. This action cannot be undone.")
-            confirm_text = st.text_input("Type DELETE ALL to confirm", key="confirm_all_text")
-            if confirm_text == "DELETE ALL":
-                if st.button("Confirm delete ALL", key="confirm_del_all"):
-                    try:
-                        db.clear_all()
-                        st.success("All memories cleared.")
-                        st.session_state['confirm_clear_all'] = False
+            if st.session_state.get('confirm_clear_all', False):
+                st.warning("This will PERMANENTLY delete ALL memories. This action cannot be undone.")
+                confirm_text = st.text_input("Type DELETE ALL to confirm", key="confirm_all_text")
+                if confirm_text == "DELETE ALL":
+                    if st.button("Confirm delete ALL", key="confirm_del_all"):
                         try:
-                            if hasattr(st, "experimental_rerun"):
-                                st.experimental_rerun()
-                            else:
+                            db.clear_all()
+                            st.success("All memories cleared.")
+                            st.session_state['confirm_clear_all'] = False
+                            try:
+                                if hasattr(st, "experimental_rerun"):
+                                    st.experimental_rerun()
+                                else:
+                                    st.info("Please refresh the page to see the changes.")
+                            except Exception:
                                 st.info("Please refresh the page to see the changes.")
-                        except Exception:
-                            st.info("Please refresh the page to see the changes.")
-                    except Exception as e:
-                        st.error(f"Failed to clear all memories: {e}")
-            else:
-                st.info("Type the exact phrase 'DELETE ALL' to enable the final confirmation button.")
+                        except Exception as e:
+                            st.error(f"Failed to clear all memories: {e}")
+                else:
+                    st.info("Type the exact phrase 'DELETE ALL' to enable the final confirmation button.")
 
