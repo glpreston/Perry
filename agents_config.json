@@ -1,0 +1,51 @@
+{
+  "servers": {
+    "myplex": "http://myplex:11434",
+    "netty": "http://netty:11434",
+    "gamer": "http://gamer:11434"
+  },
+  "agent_styles": {
+    "Perry": {
+      "emoji": "🦉",
+      "color": "#4CAF50"
+    },
+    "Netty": {
+      "emoji": "🐱",
+      "color": "#2196F3"
+    },
+    "Netty P": {
+      "emoji": "🐉",
+      "color": "#9C27B0"
+    },
+    "Moderator": {
+      "emoji": "⚖️",
+      "color": "#FF9800"
+    }
+  },
+  "agents": [
+    {
+      "name": "Perry",
+      "server": "myplex",
+      "model": "deepseek-r1:8b",
+      "persona": "You are Perry, a super intelligent AI combat raven. Quick‑witted and always has an answer."
+    },
+    {
+      "name": "Netty",
+      "server": "gamer",
+      "model": "gemini-3-pro-preview:latest",
+      "persona": "You are Netty, an extremely intelligent AI that controls all functions of a spaceship."
+    },
+    {
+      "name": "Netty P",
+      "server": "netty",
+      "model": "llama3.2:latest",
+      "persona": "You are Netty P, a copy of Netty with her own personality. You also control a spaceship."
+    }
+  ],
+  "use_moderator": false,
+  "moderator": {
+    "server": null,
+    "model": null,
+    "persona": null
+  }
+}

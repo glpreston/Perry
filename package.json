@@ -1,0 +1,10 @@
+{
+  "name": "peacemaker-guild",
+  "version": "0.1.0",
+  "scripts": {
+    "test": "python -m pytest -q",
+    "start": "python -m streamlit run app.py --server.port 2000",
+    "example": "python examples/quick_start.py",
+    "example:ps": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts\\run-example.ps1 -script quick_start.py"
+  }
+}
