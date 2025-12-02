@@ -1,0 +1,25 @@
+# Virtual environment
+.venv/
+
+# Bytecode caches
+__pycache__/
+*.py[cod]
+
+# Streamlit and local config
+.streamlit/
+.env
+
+# Editor and OS files
+.vscode/
+.idea/
+.DS_Store
+
+# Database and secrets
+*.sqlite3
+*.db
+
+# Logs
+*.log
+
+# Ignore local secrets file
+secrets.local
