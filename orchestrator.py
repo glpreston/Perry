@@ -20,13 +20,17 @@ class MultiAgentOrchestrator:
 
         # Try to initialize MemoryDB if configuration/env is present.
         try:
-            if os.getenv("DB_HOST"):
-                from memory import MemoryDB
-                try:
-                    self.memory_db = MemoryDB()
-                except Exception:
-                    # If DB init fails, leave memory_db as None but don't crash the app
-                    self.memory_db = None
+            # Import MemoryDB and let it load env (.env) itself. Previously this
+            # guarded on os.getenv("DB_HOST") which fails when a .env file is
+            # present but not yet loaded. Importing MemoryDB triggers its
+            # `load_dotenv()` so configuration from a `.env` file is honored.
+            from memory import MemoryDB
+            try:
+                self.memory_db = MemoryDB()
+            except Exception as e:
+                # If DB init fails, leave memory_db as None but don't crash the app
+                print(f"[Orchestrator] MemoryDB init failed: {e}")
+                self.memory_db = None
         except Exception:
             # If memory module isn't available or other import errors, skip DB initialization
             self.memory_db = None
@@ -161,6 +165,7 @@ class MultiAgentOrchestrator:
     def chat(self, user_query: str, messages):
         import re
         import requests
+        import uuid
 
         replies = {}
 
@@ -177,17 +182,22 @@ class MultiAgentOrchestrator:
               f"{'target=' + target_agent if target_agent else 'broadcast'} | "
               f"matched_pattern={matched_pattern} | query='{original_query}'")
 
-        # Build the list of agents to query
+        # Generate a conversation id for this chat so saved QA rows can be linked
+        conv_id = str(uuid.uuid4())
+
+        # Build the list of agents to query. We'll query non-moderator agents first
+        # and then optionally call the Moderator so it can see agents' replies.
         if target_agent:
             agent_items = [(target_agent, self.agents[target_agent])]
+            include_moderator = False
         else:
-            agent_items = list(self.agents.items())
-            if self.use_moderator and self.moderator:
-                agent_items.append(("Moderator", self.moderator))
+            # iterate all agents except the moderator here
+            agent_items = [(n, a) for n, a in self.agents.items() if n != "Moderator"]
+            include_moderator = self.use_moderator and self.moderator is not None
 
         # (Do not save the user's message here; we'll persist QA pairs after replies.)
 
-        # Query each selected agent (Ollama /api/generate)
+        # Query each selected non-moderator agent (Ollama /api/generate)
         for name, agent in agent_items:
             host = agent.host
             model = agent.model
@@ -217,38 +227,113 @@ class MultiAgentOrchestrator:
 
             try:
                 resp = requests.post(f"{host}/api/generate", json=payload, timeout=60)
-                if resp.status_code == 200:
+                # If server returns 403, try once more (transient auth/router issues may resolve)
+                if resp.status_code == 403:
+                    try:
+                        # short retry
+                        resp = requests.post(f"{host}/api/generate", json=payload, timeout=60)
+                    except Exception as _:
+                        # fall through to friendly unavailable message
+                        resp = None
+
+                if resp is not None and resp.status_code == 200:
                     data = resp.json()
                     reply_text = (data.get("response") or data.get("output") or "").strip()
                     replies[name] = reply_text if reply_text else "(No response)"
                 else:
-                    replies[name] = f"(Error {resp.status_code} from {name} at {host})"
+                    # Map common failure cases to a friendly message for the UI
+                    # If resp is None (retry failed with exception) or status is 403/5xx, show unavailable message
+                    friendly = "(Agent is unavailable at this time, check back in 10 minutes)"
+                    if resp is not None and resp.status_code not in (403, 500, 502, 503, 504):
+                        # For other codes, include status for debugging but still present friendly text
+                        friendly = f"(Agent returned HTTP {resp.status_code}; agent may be unavailable)"
+                    replies[name] = friendly
             except requests.exceptions.Timeout:
                 replies[name] = "(Timed out — server too slow)"
             except Exception as e:
                 replies[name] = f"(Request error for {name}: {e})"
 
-            # Persist QA pair into memory if DB is available
+            # Persist QA pair into memory if DB is available, include conv_id
             try:
                 if self.memory_db and replies.get(name) is not None:
                     reply_text = replies.get(name)
                     # Detect timeout/error replies and do not save them as the 'answer' field
                     low = (reply_text or "").lower()
                     is_err = (reply_text.startswith("(") and ("timed out" in low or "request error" in low or low.startswith("(error")))
+                    # Debug/log when saving so we can verify writes in live session
                     try:
+                        print(f"[Orchestrator] Saving QA for agent={name} conv_id={conv_id} is_error={is_err}")
                         if is_err:
                             # Save question-only (answer empty) so we don't inject error text
-                            self.memory_db.save_qa(name, original_query, "")
+                            self.memory_db.save_qa(name, original_query, "", conv_id=conv_id)
                         else:
-                            self.memory_db.save_qa(name, original_query, reply_text)
-                    except Exception:
+                            self.memory_db.save_qa(name, original_query, reply_text, conv_id=conv_id)
+                    except Exception as e:
+                        print(f"[Orchestrator] Memory save failed for {name}: {e}")
                         # Fallback: save legacy memory_text (avoid storing error text as answer)
-                        if not is_err:
-                            self.memory_db.save_memory(name, reply_text)
-                        else:
-                            self.memory_db.save_memory(name, original_query)
+                        try:
+                            if not is_err:
+                                self.memory_db.save_memory(name, reply_text)
+                            else:
+                                self.memory_db.save_memory(name, original_query)
+                        except Exception as e2:
+                            print(f"[Orchestrator] Fallback memory save also failed: {e2}")
             except Exception:
                 pass
+
+        # Optionally call the Moderator after other agents have replied so it can synthesize
+        # a consolidated response that takes agent replies into account.
+        if include_moderator:
+            try:
+                # Build a short summary of agent replies to include in the Moderator prompt
+                # Filter out unavailable/error replies so the Moderator doesn't get confused
+                reply_lines = []
+                def _is_error_like(text: str) -> bool:
+                    if not text:
+                        return True
+                    t = text.strip()
+                    # Parenthesized messages are typically error/diagnostic markers
+                    if t.startswith("("):
+                        return True
+                    low = t.lower()
+                    # Friendly unavailable text or explicit error words should be excluded
+                    if "unavailable" in low or "error" in low or "timed out" in low or "request error" in low:
+                        return True
+                    # Reuse PromptBuilder heuristics where possible
+                    try:
+                        if PromptBuilder.is_error_text(t):
+                            return True
+                    except Exception:
+                        pass
+                    return False
+
+                for aname, aresp in replies.items():
+                    if aname == "Moderator":
+                        continue
+                    if _is_error_like(aresp):
+                        continue
+                    reply_lines.append(f"{aname}: {aresp}")
+
+                moderator_context = "\n".join(reply_lines)
+                moderator_prompt = "[Agent replies:\n" + moderator_context + "]\n\n" + original_query
+
+                mod = self.moderator
+                mod_system = getattr(mod, "persona", "") or getattr(mod, "personality", "")
+                mod_payload = {
+                    "model": mod.model,
+                    "prompt": moderator_prompt,
+                    "system": mod_system,
+                    "stream": False
+                }
+                mresp = requests.post(f"{mod.host}/api/generate", json=mod_payload, timeout=60)
+                if mresp.status_code == 200:
+                    mdata = mresp.json()
+                    mtext = (mdata.get("response") or mdata.get("output") or "").strip()
+                    replies["Moderator"] = mtext if mtext else "(No response)"
+                else:
+                    replies["Moderator"] = f"(Error {mresp.status_code} from Moderator at {mod.host})"
+            except Exception as e:
+                replies["Moderator"] = f"(Request error for Moderator: {e})"
 
         # If this was a broadcast (no specific target) and we have a Moderator reply,
         # save the Moderator's synthesized answer into group memory as a QA pair.

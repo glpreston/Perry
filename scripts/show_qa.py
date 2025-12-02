@@ -18,11 +18,14 @@ if __name__ == '__main__':
         if not qa:
             print('  (no QA entries)')
         else:
-            for item in qa:
-                print('---')
-                print('Q:', item.get('q'))
-                print('A:', item.get('a'))
-                print('TS:', item.get('ts'))
+                for item in qa:
+                    print('---')
+                    print('Q:', item.get('q'))
+                    print('A:', item.get('a'))
+                    # Attempt to show conv_id if present in the row dict
+                    if 'conv_id' in item:
+                        print('conv_id:', item.get('conv_id'))
+                    print('TS:', item.get('ts'))
 
         print('\nRecent group QA (', GROUP_KEY, '):')
         gqa = db.load_recent_qa(None, limit=10)
@@ -33,6 +36,8 @@ if __name__ == '__main__':
                 print('---')
                 print('Q:', item.get('q'))
                 print('A:', item.get('a'))
+                if 'conv_id' in item:
+                    print('conv_id:', item.get('conv_id'))
                 print('TS:', item.get('ts'))
     except Exception as e:
         print('Error querying QA:', e)

@@ -22,6 +22,15 @@ def render_app():
     if "orchestrator" not in st.session_state:
         orch = MultiAgentOrchestrator()
         orch.load_config()  # loads servers, agent_styles, agents, moderator
+        # Debug: report memory DB state when orchestrator is first created in this session
+        try:
+            mdb = orch.memory_db
+            if mdb is None:
+                print("[App] Orchestrator.memory_db is None (no DB configured in this session)")
+            else:
+                print(f"[App] Orchestrator.memory_db present, connected={mdb.is_connected()}")
+        except Exception as e:
+            print(f"[App] Error checking memory_db: {e}")
         st.session_state["orchestrator"] = orch
 
     orch = st.session_state["orchestrator"]
@@ -63,6 +72,15 @@ def render_app():
         st.session_state.setdefault("query_history", []).append(user_query)
 
         with st.spinner("Thinking..."):
+            # Debug: report memory DB state right before calling chat
+            try:
+                if orch.memory_db is None:
+                    print("[App] Before chat: orch.memory_db is None")
+                else:
+                    print(f"[App] Before chat: orch.memory_db.is_connected={orch.memory_db.is_connected()}")
+            except Exception as e:
+                print(f"[App] Before chat: error checking memory_db: {e}")
+
             # Memory injection is handled inside `orch.chat` (per-agent and optional group memory)
             replies = orch.chat(user_query, st.session_state["messages"])
 
