@@ -6,7 +6,9 @@ class Router:
     """Simple router to decide if a query targets a specific agent or is a broadcast."""
 
     @staticmethod
-    def route(original_query: str, agent_names: List[str]) -> Tuple[Optional[str], Optional[str]]:
+    def route(
+        original_query: str, agent_names: List[str]
+    ) -> Tuple[Optional[str], Optional[str]]:
         """Return (target_agent, matched_pattern).
 
         `target_agent` is the name of the matched agent (or None for broadcast).

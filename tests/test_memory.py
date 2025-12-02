@@ -6,7 +6,12 @@ def is_error_text(s: str) -> bool:
     if not s:
         return False
     low = s.lower()
-    return (low.startswith("(error") or "timed out" in low or "request error" in low or "timeout" in low)
+    return (
+        low.startswith("(error")
+        or "timed out" in low
+        or "request error" in low
+        or "timeout" in low
+    )
 
 
 def test_memory_filtering_flow():
@@ -27,10 +32,10 @@ def test_memory_filtering_flow():
 
     # Load and apply the same filtering heuristic used in the app
     rows = db.load_recent_qa(agent, limit=10)
-    filtered = [r for r in rows if r.get('a') and not is_error_text(r.get('a'))]
+    filtered = [r for r in rows if r.get("a") and not is_error_text(r.get("a"))]
 
     # We expect only the good answer to survive the filter
-    answers = [r.get('a') for r in filtered]
+    answers = [r.get("a") for r in filtered]
     assert "This is a good answer" in answers
     assert all(not is_error_text(a) for a in answers)
 

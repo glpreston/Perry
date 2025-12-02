@@ -2,7 +2,9 @@ from prompt_builder import PromptBuilder
 
 
 def test_strip_leading_agent_name():
-    assert PromptBuilder.strip_leading_agent_name("Netty: how are you?") == "how are you?"
+    assert (
+        PromptBuilder.strip_leading_agent_name("Netty: how are you?") == "how are you?"
+    )
     assert PromptBuilder.strip_leading_agent_name("Rex - play!") == "play!"
 
 

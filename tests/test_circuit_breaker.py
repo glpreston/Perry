@@ -1,10 +1,8 @@
 import time
-from unittest import mock
 
 import requests
 
 from orchestrator import MultiAgentOrchestrator
-from agents import Agent
 
 
 def test_circuit_breaker_skips_after_failures(monkeypatch):

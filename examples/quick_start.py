@@ -8,11 +8,11 @@ the project.
 Run:
     .\.venv\Scripts\python.exe examples\quick_start.py
 """
+
 from __future__ import annotations
 
 import os
 import sys
-import uuid
 import json
 import requests
 
@@ -54,7 +54,9 @@ def main():
 
     logging.getLogger(__name__).info("Agents loaded:")
     for name, agent in orch.agents.items():
-        logging.getLogger(__name__).info(f" - {name}: host={agent.host} model={agent.model}")
+        logging.getLogger(__name__).info(
+            f" - {name}: host={agent.host} model={agent.model}"
+        )
 
     # Prepare fake responses for the demo
     mapping = {
@@ -73,33 +75,45 @@ def main():
             q1 = f"{first_agent}: How are you?"
             logging.getLogger(__name__).info(f"\nAddressed query: {q1}")
             replies = orch.chat(q1, messages=None)
-            logging.getLogger(__name__).info('Replies: %s', json.dumps(replies, ensure_ascii=False, indent=2))
+            logging.getLogger(__name__).info(
+                "Replies: %s", json.dumps(replies, ensure_ascii=False, indent=2)
+            )
 
         # Broadcast example
         q2 = "Hello all, what's new?"
         logging.getLogger(__name__).info(f"\nBroadcast query: {q2}")
         replies2 = orch.chat(q2, messages=None)
-        logging.getLogger(__name__).info('Replies: %s', json.dumps(replies2, ensure_ascii=False, indent=2))
+        logging.getLogger(__name__).info(
+            "Replies: %s", json.dumps(replies2, ensure_ascii=False, indent=2)
+        )
 
         # Memory DB demo (safe: checks for presence)
         if orch.memory_db:
             db = orch.memory_db
             test_agent = next(iter(orch.agents.keys())) if orch.agents else "example"
-            logging.getLogger(__name__).info(f"\nMemoryDB found (host={db.host}). Demonstrating save/load for {test_agent}.")
+            logging.getLogger(__name__).info(
+                f"\nMemoryDB found (host={db.host}). Demonstrating save/load for {test_agent}."
+            )
             db.save_qa(test_agent, "Demo question", "Demo answer")
             rows = db.load_recent_qa(test_agent, limit=5)
-            logging.getLogger(__name__).info('Recent QA rows:')
+            logging.getLogger(__name__).info("Recent QA rows:")
             for r in rows:
-                logging.getLogger(__name__).info('%s', r)
+                logging.getLogger(__name__).info("%s", r)
         else:
-            logging.getLogger(__name__).info("\nNo MemoryDB configured. Skipping DB demo.")
+            logging.getLogger(__name__).info(
+                "\nNo MemoryDB configured. Skipping DB demo."
+            )
 
         # Save a copy of the current config (safe write)
         try:
             orch.save_config("agents_config.example.json")
-            logging.getLogger(__name__).info("\nWrote example config to agents_config.example.json")
+            logging.getLogger(__name__).info(
+                "\nWrote example config to agents_config.example.json"
+            )
         except Exception as e:
-            logging.getLogger(__name__).exception('Could not write example config: %s', e)
+            logging.getLogger(__name__).exception(
+                "Could not write example config: %s", e
+            )
 
     finally:
         # restore requests
