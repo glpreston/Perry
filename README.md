@@ -1,3 +1,37 @@
+# Perry
+
+Peacemaker Guild — local multi-agent Streamlit app.
+
+Quick start
+
+1. Create a virtualenv and activate it (Windows PowerShell):
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+```
+
+2. Install runtime deps and dev tools:
+
+```powershell
+pip install -r requirements.txt
+pip install -r requirements-dev.txt
+```
+
+3. Copy `.env.example` -> `.env` and fill DB credentials (DB_HOST, DB_USER, DB_PASS, DB_NAME).
+
+	- Do NOT commit your `.env` file; it should remain in `.gitignore` to protect secrets.
+
+4. Run Streamlit:
+
+```powershell
+python -m streamlit run app.py --server.port 2000
+```
+
+Developer notes
+
+- Use `pre-commit` hooks to format/lint before commits: `pre-commit install`.
+- CI runs tests and ruff linting on PRs.
 Peacemaker Guild
 =================
 

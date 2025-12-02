@@ -12,6 +12,7 @@ from config import MultiAgentOrchestrator
 from memory import MemoryDB
 import requests
 import time
+import logging
 
 
 class FakeResponse:
@@ -37,10 +38,11 @@ def make_fake_post(mapping):
 
 
 def print_rows(db, key):
+    logger = logging.getLogger(__name__)
     rows = db.load_recent_qa(key, limit=10)
-    print(f"--- Rows for '{key}' (count={len(rows)}) ---")
+    logger.info("--- Rows for '%s' (count=%d) ---", key, len(rows))
     for r in rows:
-        print(r)
+        logger.info('%s', r)
 
 
 def main():
@@ -74,17 +76,16 @@ def main():
     requests.post = make_fake_post(mapping)
 
     try:
-        print("Sending addressed message to NettyTest...")
+        logging.getLogger(__name__).info("Sending addressed message to NettyTest...")
         resp1 = orch.chat(f"{agent_name}: How are you?", messages=None)
-        print("Replies:", resp1)
+        logging.getLogger(__name__).info('Replies: %s', resp1)
         time.sleep(0.2)
-
         print_rows(db, agent_name)
         print_rows(db, "__group__")
 
-        print("\nSending broadcast message to all agents...")
+        logging.getLogger(__name__).info("\nSending broadcast message to all agents...")
         resp2 = orch.chat("Hello all, what's new?", messages=None)
-        print("Replies:", resp2)
+        logging.getLogger(__name__).info('Replies: %s', resp2)
         time.sleep(0.2)
 
         print_rows(db, agent_name)

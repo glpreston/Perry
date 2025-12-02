@@ -15,6 +15,7 @@ import os
 import argparse
 import csv
 import json
+import logging
 
 # Ensure project root is importable
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -57,13 +58,13 @@ def main():
     out_path = args.out
     fmt = args.format or (os.path.splitext(out_path)[1].lstrip('.').lower() or 'csv')
     if fmt not in ('csv', 'json'):
-        print('Unknown output format:', fmt)
+        logging.getLogger(__name__).warning('Unknown output format: %s', fmt)
         sys.exit(2)
 
     db = MemoryDB()
 
     key = None if args.group else args.agent
-    print(f"Exporting {'group' if args.group else 'agent ' + args.agent} memories to {out_path} (limit={args.limit})")
+    logging.getLogger(__name__).info(f"Exporting {'group' if args.group else 'agent ' + (args.agent or '')} memories to {out_path} (limit={args.limit})")
 
     rows = db.load_recent_qa(key, limit=args.limit)
 
@@ -82,7 +83,7 @@ def main():
     else:
         export_to_json(normalized, out_path)
 
-    print(f"Export complete: wrote {len(normalized)} rows to {out_path}")
+    logging.getLogger(__name__).info(f"Export complete: wrote {len(normalized)} rows to {out_path}")
 
 
 if __name__ == '__main__':

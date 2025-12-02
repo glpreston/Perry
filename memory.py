@@ -25,7 +25,8 @@ class MemoryDB:
 
     def _connect(self):
         try:
-            print(f"[MemoryDB] Connecting to {self.host}:{self.port} as {self.user}")
+            import logging
+            logging.getLogger(__name__).info(f"[MemoryDB] Connecting to {self.host}:{self.port} as {self.user}")
             self.conn = mysql.connector.connect(
                 host=self.host,
                 port=self.port,
@@ -36,13 +37,16 @@ class MemoryDB:
                 connection_timeout=10,  # less brittle than 5
             )
             if self.conn.is_connected():
-                print("[MemoryDB] Connected successfully")
+                import logging
+                logging.getLogger(__name__).info("[MemoryDB] Connected successfully")
                 self.cursor = self.conn.cursor(buffered=True)
             else:
-                print("[MemoryDB] Connection failed")
+                import logging
+                logging.getLogger(__name__).warning("[MemoryDB] Connection failed")
                 self.cursor = None
         except Error as e:
-            print(f"[MemoryDB] Error connecting to MySQL: {e}")
+            import logging
+            logging.getLogger(__name__).warning(f"[MemoryDB] Error connecting to MySQL: {e}")
             self.cursor = None
 
     def _ensure_schema(self):
@@ -75,7 +79,8 @@ class MemoryDB:
             except Exception:
                 pass
         except Error as e:
-            print(f"[MemoryDB] Error ensuring schema: {e}")
+            import logging
+            logging.getLogger(__name__).warning(f"[MemoryDB] Error ensuring schema: {e}")
 
     def _reconnect_if_needed(self, err: Optional[Error]) -> bool:
         """Return True if we reconnected due to a retryable error."""
@@ -105,7 +110,8 @@ class MemoryDB:
                 return self.cursor.fetchall()
             return None
         except Error as e:
-            print(f"[MemoryDB] DB error: {e}")
+            import logging
+            logging.getLogger(__name__).warning(f"[MemoryDB] DB error: {e}")
             # Attempt a single reconnect and retry
             if retries > 0 and self._reconnect_if_needed(e):
                 try:
@@ -114,7 +120,8 @@ class MemoryDB:
                         return self.cursor.fetchall()
                     return None
                 except Error as e2:
-                    print(f"[MemoryDB] Retry failed: {e2}")
+                    import logging
+                    logging.getLogger(__name__).warning(f"[MemoryDB] Retry failed: {e2}")
             # Give up
             return [] if fetch else None
 
@@ -173,6 +180,27 @@ class MemoryDB:
         sql = "SELECT memory_text FROM agent_memory WHERE agent_name=%s ORDER BY timestamp DESC LIMIT %s"
         rows = self._try_execute(sql, (GROUP_KEY, limit), fetch=True, retries=1)
         return [row[0] for row in rows] if rows else []
+
+    def fetch_recent_rows(self, limit: int = 50) -> List[dict]:
+        """Return recent rows with full columns for inspection.
+
+        Returns list of dicts: {id, agent_name, question, answer, conv_id, timestamp}
+        """
+        sql = "SELECT id, agent_name, question, answer, conv_id, timestamp FROM agent_memory ORDER BY timestamp DESC LIMIT %s"
+        rows = self._try_execute(sql, (limit,), fetch=True, retries=1)
+        result = []
+        if not rows:
+            return result
+        for rid, agent_name, q, a, conv, ts in rows:
+            result.append({
+                "id": rid,
+                "agent_name": agent_name,
+                "question": q,
+                "answer": a,
+                "conv_id": conv,
+                "timestamp": ts,
+            })
+        return result
 
     def save_group_memory(self, memory_text: str):
         """Save a memory entry into the group memory bucket."""
