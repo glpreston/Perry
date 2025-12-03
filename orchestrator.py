@@ -10,7 +10,7 @@ This implementation supports:
 import json
 import logging
 import re
-import requests
+import requests  # type: ignore[import]
 import uuid
 import time
 from typing import Dict, List, Optional, Tuple
@@ -64,7 +64,16 @@ class MultiAgentOrchestrator:
         chained_calls: List[Tuple[str, str]] = []
         if target_agent and self.use_delegation:
             lowered_q = original_query.lower()
-            prefixes = ["ask", "please ask", "can you ask", "could you ask", "please have", "tell", "relay to", "pass to"]
+            prefixes = [
+                "ask",
+                "please ask",
+                "can you ask",
+                "could you ask",
+                "please have",
+                "tell",
+                "relay to",
+                "pass to",
+            ]
             for aname in self.agents.keys():
                 if aname.lower() == target_agent.lower():
                     continue
@@ -79,13 +88,13 @@ class MultiAgentOrchestrator:
                 if chained_calls:
                     break
             # proximity fallback
-            if not chained_calls and 'ask' in lowered_q:
+            if not chained_calls and "ask" in lowered_q:
                 for aname in self.agents.keys():
                     if aname.lower() == target_agent.lower():
                         continue
-                    idx = lowered_q.find('ask')
+                    idx = lowered_q.find("ask")
                     if idx >= 0:
-                        tail = lowered_q[idx: idx + 120]
+                        tail = lowered_q[idx : idx + 120]
                         if aname.lower() in tail:
                             parts = tail.split(aname.lower(), 1)
                             if len(parts) > 1:
@@ -105,25 +114,36 @@ class MultiAgentOrchestrator:
                 continue
             payload = {
                 "model": getattr(agent, "model", None),
-                "prompt": PromptBuilder.build_prompt(original_query, name, agent, self.memory_db, self.use_memory, self.use_group_memory, target_agent),
+                "prompt": PromptBuilder.build_prompt(
+                    original_query,
+                    name,
+                    agent,
+                    self.memory_db,
+                    self.use_memory,
+                    self.use_group_memory,
+                    target_agent,
+                ),
                 # include agent name in system prompt so the model answers as the agent
-                "system": f"You are {name}. " + (getattr(agent, "persona", "") or getattr(agent, "personality", "")),
+                "system": f"You are {name}. "
+                + (getattr(agent, "persona", "") or getattr(agent, "personality", "")),
                 "stream": False,
             }
             # try with one retry on failure
             attempt = 0
             resp = None
-            last_exc = None
             while attempt < 2:
                 try:
-                    resp = requests.post(f"{agent.host}/api/generate", json=payload, timeout=30)
+                    resp = requests.post(
+                        f"{agent.host}/api/generate", json=payload, timeout=30
+                    )
                     if resp is not None and resp.status_code == 200:
                         data = resp.json()
-                        text = (data.get("response") or data.get("output") or "").strip()
+                        text = (
+                            data.get("response") or data.get("output") or ""
+                        ).strip()
                         replies[name] = text or "(No response)"
                         break
                     else:
-                        last_exc = None
                         replies[name] = "(Agent unavailable)"
                         # mark status down and increment failure count
                         self.agent_status[name] = "down"
@@ -131,7 +151,6 @@ class MultiAgentOrchestrator:
                         if self.fail_counts[name] >= self.failure_threshold:
                             self.cooldowns[name] = time.time() + self.cooldown_seconds
                 except Exception as e:
-                    last_exc = e
                     replies[name] = f"(Request error for {name}: {e})"
                     self.agent_status[name] = "down"
                     self.fail_counts[name] = self.fail_counts.get(name, 0) + 1
@@ -141,13 +160,16 @@ class MultiAgentOrchestrator:
                 attempt += 1
                 if attempt < 2:
                     try:
-                        self.logger.info(f"[Orch] retrying {name} (attempt {attempt+1})")
+                        self.logger.info(
+                            f"[Orch] retrying {name} (attempt {attempt+1})"
+                        )
                         time.sleep(1)
                     except Exception:
                         pass
             # if the final outcome looked successful, mark agent ok
             try:
-                if replies.get(name) and not replies.get(name).startswith("("):
+                ans = replies.get(name) or ""
+                if ans and not ans.startswith("("):
                     self.agent_status[name] = "ok"
                     # reset failure counts on success
                     self.fail_counts[name] = 0
@@ -159,13 +181,19 @@ class MultiAgentOrchestrator:
             # persist per-agent QA
             try:
                 if self.memory_db and replies.get(name) is not None:
-                    ans = replies.get(name)
-                    low = (ans or "").lower()
-                    is_err = ans.startswith("(") and ("timed out" in low or "request error" in low)
+                    ans = replies.get(name) or ""
+                    low = ans.lower()
+                    is_err = ans.startswith("(") and (
+                        "timed out" in low or "request error" in low
+                    )
                     if is_err:
-                        self.memory_db.save_qa(name, original_query, "", conv_id=conv_id)
+                        self.memory_db.save_qa(
+                            name, original_query, "", conv_id=conv_id
+                        )
                     else:
-                        self.memory_db.save_qa(name, original_query, ans, conv_id=conv_id)
+                        self.memory_db.save_qa(
+                            name, original_query, ans, conv_id=conv_id
+                        )
             except Exception:
                 pass
 
@@ -190,21 +218,37 @@ class MultiAgentOrchestrator:
                     replies[cname] = f"(Agent {cname} not found)"
                     continue
                 primary = replies.get(target_agent, "")[:800]
-                chained_prompt = f"[Requested by {target_agent}]\nPrimary reply: {primary}\n---\n" + cquestion
+                chained_prompt = (
+                    f"[Requested by {target_agent}]\nPrimary reply: {primary}\n---\n"
+                    + cquestion
+                )
                 payload = {
                     "model": cagent.model,
-                    "prompt": PromptBuilder.build_prompt(chained_prompt, cname, cagent, self.memory_db, self.use_memory, self.use_group_memory, target_agent=cname),
-                    "system": getattr(cagent, "persona", "") or getattr(cagent, "personality", ""),
+                    "prompt": PromptBuilder.build_prompt(
+                        chained_prompt,
+                        cname,
+                        cagent,
+                        self.memory_db,
+                        self.use_memory,
+                        self.use_group_memory,
+                        target_agent=cname,
+                    ),
+                    "system": getattr(cagent, "persona", "")
+                    or getattr(cagent, "personality", ""),
                     "stream": False,
                 }
                 # chained call: also retry once on failure
                 attempt = 0
                 while attempt < 2:
                     try:
-                        cresp = requests.post(f"{cagent.host}/api/generate", json=payload, timeout=60)
+                        cresp = requests.post(
+                            f"{cagent.host}/api/generate", json=payload, timeout=60
+                        )
                         if cresp is not None and cresp.status_code == 200:
                             cdata = cresp.json()
-                            creply = (cdata.get("response") or cdata.get("output") or "").strip()
+                            creply = (
+                                cdata.get("response") or cdata.get("output") or ""
+                            ).strip()
                             replies[cname] = creply or "(No response)"
                             self.agent_status[cname] = "ok"
                             break
@@ -218,7 +262,9 @@ class MultiAgentOrchestrator:
                     attempt += 1
                     if attempt < 2:
                         try:
-                            self.logger.info(f"[Orch] retrying chained call {cname} (attempt {attempt+1})")
+                            self.logger.info(
+                                f"[Orch] retrying chained call {cname} (attempt {attempt+1})"
+                            )
                             time.sleep(1)
                         except Exception:
                             pass
@@ -226,7 +272,9 @@ class MultiAgentOrchestrator:
                 # persist chained QA
                 try:
                     if self.memory_db and replies.get(cname) is not None:
-                        self.memory_db.save_qa(cname, cquestion, replies.get(cname), conv_id=conv_id)
+                        self.memory_db.save_qa(
+                            cname, cquestion, replies.get(cname), conv_id=conv_id
+                        )
                 except Exception:
                     pass
 
@@ -239,7 +287,9 @@ class MultiAgentOrchestrator:
                         parts.append(f"[{cname} replied]: {ctext}")
                     if parts:
                         # Append quoted replies to primary agent's reply so it can quote others
-                        replies[target_agent] = replies.get(target_agent, "") + "\n\n" + "\n\n".join(parts)
+                        replies[target_agent] = (
+                            replies.get(target_agent, "") + "\n\n" + "\n\n".join(parts)
+                        )
             except Exception:
                 pass
 
@@ -248,12 +298,19 @@ class MultiAgentOrchestrator:
             if self.use_primary_rephrase:
                 try:
                     primary_agent = self.agents.get(target_agent)
-                    if primary_agent:
+                    if primary_agent is None:
+                        # no primary agent available; skip primary rephrase
+                        pass
+                    else:
                         primary_before = replies.get(target_agent, "")
-                    rephrase_parts = [f"Original question: {original_query}", f"Your original reply: {primary_before}", "Other agents replied:"]
-                    for cname, _ in chained_calls:
-                        retext = replies.get(cname, "(no reply)")
-                        rephrase_parts.append(f"- {cname}: {retext}")
+                        rephrase_parts: List[str] = [
+                            f"Original question: {original_query}",
+                            f"Your original reply: {primary_before}",
+                            "Other agents replied:",
+                        ]
+                        for cname, _ in chained_calls:
+                            retext = replies.get(cname, "(no reply)")
+                            rephrase_parts.append(f"- {cname}: {retext}")
                     # Strongly instruct the primary agent to produce a predictable quoting format
                     # The response must be in the primary agent's voice and follow this exact structure:
                     # <AgentName>: "<final reply content>"
@@ -265,32 +322,55 @@ class MultiAgentOrchestrator:
                         + "\n\nPlease produce a revised reply in the voice of "
                         + target_agent
                         + ". Follow this exact format (do not add extra sections):\n"
-                        + f"{target_agent}: \"<your reply here>\"\n\nQuoted replies:\n"
+                        + f'{target_agent}: "<your reply here>"\n\nQuoted replies:\n'
                     )
                     for cname, _ in chained_calls:
                         crep = replies.get(cname, "(no reply)")
-                        rephrase_prompt += f"- {cname}: \"{crep}\"\n"
-                    rephrase_prompt += (
-                        "\nKeep the final reply concise (1-3 sentences). If you rely on another agent's answer, briefly cite them in parentheses."
-                    )
+                        rephrase_prompt += f'- {cname}: "{crep}"\n'
+                    rephrase_prompt += "\nKeep the final reply concise (1-3 sentences). If you rely on another agent's answer, briefly cite them in parentheses."
 
                     rpayload = {
                         "model": getattr(primary_agent, "model", None),
-                        "prompt": PromptBuilder.build_prompt(rephrase_prompt, target_agent, primary_agent, self.memory_db, self.use_memory, self.use_group_memory, target_agent=target_agent),
-                        "system": f"You are {target_agent}. " + (getattr(primary_agent, "persona", "") or getattr(primary_agent, "personality", "")),
+                        "prompt": PromptBuilder.build_prompt(
+                            rephrase_prompt,
+                            target_agent,
+                            primary_agent,
+                            self.memory_db,
+                            self.use_memory,
+                            self.use_group_memory,
+                            target_agent=target_agent,
+                        ),
+                        "system": f"You are {target_agent}. "
+                        + (
+                            getattr(primary_agent, "persona", "")
+                            or getattr(primary_agent, "personality", "")
+                        ),
                         "stream": False,
                     }
                     try:
-                        rresp = requests.post(f"{primary_agent.host}/api/generate", json=rpayload, timeout=30)
+                        # primary_agent is known to be not None here
+                        assert primary_agent is not None
+                        rresp = requests.post(
+                            f"{primary_agent.host}/api/generate",
+                            json=rpayload,
+                            timeout=30,
+                        )
                         if rresp is not None and rresp.status_code == 200:
                             rdata = rresp.json()
-                            rtext = (rdata.get("response") or rdata.get("output") or "").strip()
+                            rtext = (
+                                rdata.get("response") or rdata.get("output") or ""
+                            ).strip()
                             if rtext:
                                 replies[target_agent] = rtext
                                 # persist rephrased primary reply
                                 try:
                                     if self.memory_db:
-                                        self.memory_db.save_qa(target_agent, original_query, rtext, conv_id=conv_id)
+                                        self.memory_db.save_qa(
+                                            target_agent,
+                                            original_query,
+                                            rtext,
+                                            conv_id=conv_id,
+                                        )
                                 except Exception:
                                     pass
                         else:
@@ -311,7 +391,7 @@ class MultiAgentOrchestrator:
         if not target_agent and self.use_moderator and self.moderator:
             try:
                 # Build a concise summary prompt containing the question and agent replies
-                summary_parts = [f"Question: {original_query}", "Replies:"]
+                summary_parts: List[str] = [f"Question: {original_query}", "Replies:"]
                 for n, txt in replies.items():
                     summary_parts.append(f"- {n}: {txt}")
                 summary_prompt = "\n".join(summary_parts)
@@ -325,21 +405,44 @@ class MultiAgentOrchestrator:
 
                 mpayload = {
                     "model": getattr(self.moderator, "model", None),
-                    "prompt": PromptBuilder.build_prompt(summary_prompt + "\n\nPlease rank these replies and give a single recommended answer.", self.moderator.name, self.moderator, self.memory_db, self.use_memory, self.use_group_memory, target_agent=None),
-                    "system": moderator_instruction + " " + (getattr(self.moderator, "persona", "") or getattr(self.moderator, "personality", "")),
+                    "prompt": PromptBuilder.build_prompt(
+                        summary_prompt
+                        + "\n\nPlease rank these replies and give a single recommended answer.",
+                        self.moderator.name,
+                        self.moderator,
+                        self.memory_db,
+                        self.use_memory,
+                        self.use_group_memory,
+                        target_agent=None,
+                    ),
+                    "system": moderator_instruction
+                    + " "
+                    + (
+                        getattr(self.moderator, "persona", "")
+                        or getattr(self.moderator, "personality", "")
+                    ),
                     "stream": False,
                 }
                 mresp = None
                 try:
-                    mresp = requests.post(f"{self.moderator.host}/api/generate", json=mpayload, timeout=30)
+                    mresp = requests.post(
+                        f"{self.moderator.host}/api/generate", json=mpayload, timeout=30
+                    )
                     if mresp is not None and mresp.status_code == 200:
                         mdata = mresp.json()
-                        mtext = (mdata.get("response") or mdata.get("output") or "").strip()
+                        mtext = (
+                            mdata.get("response") or mdata.get("output") or ""
+                        ).strip()
                         replies["Moderator"] = mtext or "(No moderator response)"
                         # persist moderator QA
                         try:
                             if self.memory_db:
-                                self.memory_db.save_qa("Moderator", summary_prompt, replies.get("Moderator"), conv_id=conv_id)
+                                self.memory_db.save_qa(
+                                    "Moderator",
+                                    summary_prompt,
+                                    replies.get("Moderator"),
+                                    conv_id=conv_id,
+                                )
                         except Exception:
                             pass
                         # mark moderator ok
@@ -373,17 +476,27 @@ class MultiAgentOrchestrator:
 
         self.agents = {}
         for agent_cfg in cfg.get("agents", []):
-            server_url = self.servers.get(agent_cfg.get("server"), agent_cfg.get("server"))
+            server_url = self.servers.get(
+                agent_cfg.get("server"), agent_cfg.get("server")
+            )
             persona = agent_cfg.get("personality") or agent_cfg.get("persona", "")
-            self.add_agent(agent_cfg["name"], server_url, agent_cfg.get("model"), persona)
+            self.add_agent(
+                agent_cfg["name"], server_url, agent_cfg.get("model"), persona
+            )
 
         # moderator
         self.use_moderator = cfg.get("use_moderator", False)
         moderator_cfg = cfg.get("moderator")
         if moderator_cfg:
-            server_url = self.servers.get(moderator_cfg.get("server"), moderator_cfg.get("server"))
-            mod_persona = moderator_cfg.get("personality") or moderator_cfg.get("persona", "You are the moderator.")
-            self.moderator = Agent("Moderator", server_url, moderator_cfg.get("model"), mod_persona)
+            server_url = self.servers.get(
+                moderator_cfg.get("server"), moderator_cfg.get("server")
+            )
+            mod_persona = moderator_cfg.get("personality") or moderator_cfg.get(
+                "persona", "You are the moderator."
+            )
+            self.moderator = Agent(
+                "Moderator", server_url, moderator_cfg.get("model"), mod_persona
+            )
             if self.use_moderator:
                 self.agents["Moderator"] = self.moderator
 
@@ -391,11 +504,11 @@ class MultiAgentOrchestrator:
         cfg = {
             "servers": self.servers,
             "agent_styles": self.agent_styles,
-            "agents": [],
             "use_moderator": self.use_moderator,
             "moderator": {"server": None, "model": None, "persona": None},
         }
 
+        agents_list: List[dict] = []
         for name, agent in self.agents.items():
             if name == "Moderator":
                 continue
@@ -404,12 +517,16 @@ class MultiAgentOrchestrator:
                 if v == agent.host:
                     server_name = k
                     break
-            cfg["agents"].append({
-                "name": agent.name,
-                "server": server_name or agent.host,
-                "model": agent.model,
-                "persona": agent.persona,
-            })
+            agents_list.append(
+                {
+                    "name": agent.name,
+                    "server": server_name or agent.host,
+                    "model": agent.model,
+                    "persona": agent.persona,
+                }
+            )
+
+        cfg["agents"] = agents_list
 
         if self.moderator:
             server_name = None
@@ -472,7 +589,9 @@ class MultiAgentOrchestrator:
                         # pick first server value
                         host = next(iter(self.servers.values()))
                     host = host or ""
-                    self.moderator = Agent("Moderator", host, None, "You are the moderator.")
+                    self.moderator = Agent(
+                        "Moderator", host, None, "You are the moderator."
+                    )
                 # ensure present in agents mapping
                 self.agents["Moderator"] = self.moderator
             else:

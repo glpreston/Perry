@@ -29,7 +29,11 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: '3.11'
-      - name: Install ruff
-        run: pip install ruff==0.18.0
+      - name: Install dev dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
       - name: Run ruff
-        run: ruff check .
+        run: |
+          # use the ruff installed from requirements-dev.txt
+          ruff check .

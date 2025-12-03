@@ -10,6 +10,7 @@ from config import get_models_for_server
 
 CONFIG_PATH = Path("agents_config.json")
 
+
 def render_sidebar(orch, agent_styles, servers):
     st.header("⚙️ Control Panel")
     # --- Per-agent controls ---
@@ -27,7 +28,10 @@ def render_sidebar(orch, agent_styles, servers):
         # Sanitize name for use in Streamlit widget keys
         safe_name = re.sub(r"[^A-Za-z0-9_\-]", "_", name)
         # Use an expander per agent for a compact layout; include health status
-        with st.expander(f"{status_emoji} {emoji} {name}", expanded=(name == getattr(orch, "active_agent", None))):
+        with st.expander(
+            f"{status_emoji} {emoji} {name}",
+            expanded=(name == getattr(orch, "active_agent", None)),
+        ):
             sel_agent = orch.agents[name]
 
             # Determine the current server selection for this agent (match by host)
@@ -41,7 +45,11 @@ def render_sidebar(orch, agent_styles, servers):
             selected_server = st.selectbox(
                 "Server",
                 server_names,
-                index=server_names.index(current_server_name) if current_server_name in server_names else 0,
+                index=(
+                    server_names.index(current_server_name)
+                    if current_server_name in server_names
+                    else 0
+                ),
                 key=f"server_{safe_name}",
             )
             # Update the agent's host based on the selected server
@@ -69,7 +77,14 @@ def render_sidebar(orch, agent_styles, servers):
     # Ensure global active_server/model reflect the currently active agent (if any)
     if getattr(orch, "active_agent", None) in agent_names:
         active = orch.active_agent
-        orch.active_server = next((k for k, v in servers.items() if v == getattr(orch.agents[active], "host", None)), None)
+        orch.active_server = next(
+            (
+                k
+                for k, v in servers.items()
+                if v == getattr(orch.agents[active], "host", None)
+            ),
+            None,
+        )
         orch.active_model = getattr(orch.agents[active], "model", None)
 
     # --- Moderator toggle + status indicator ---
@@ -87,18 +102,26 @@ def render_sidebar(orch, agent_styles, servers):
     orch.set_memory_usage(use_memory)
 
     # --- Group Memory toggle ---
-    use_group_memory = st.checkbox("Use Group Memory", value=getattr(orch, "use_group_memory", False))
+    use_group_memory = st.checkbox(
+        "Use Group Memory", value=getattr(orch, "use_group_memory", False)
+    )
     orch.use_group_memory = use_group_memory
 
     # --- Delegation toggle ---
-    use_delegation = st.checkbox("Enable Delegation (ask <Agent> ...)", value=getattr(orch, "use_delegation", True))
+    use_delegation = st.checkbox(
+        "Enable Delegation (ask <Agent> ...)",
+        value=getattr(orch, "use_delegation", True),
+    )
     try:
         orch.set_delegation_usage(use_delegation)
     except Exception:
         orch.use_delegation = use_delegation
 
     # --- Primary-rephrase toggle ---
-    use_rephrase = st.checkbox("Primary rephrase (quote other agents)", value=getattr(orch, "use_primary_rephrase", True))
+    use_rephrase = st.checkbox(
+        "Primary rephrase (quote other agents)",
+        value=getattr(orch, "use_primary_rephrase", True),
+    )
     try:
         orch.set_primary_rephrase_usage(use_rephrase)
     except Exception:
@@ -112,7 +135,9 @@ def render_sidebar(orch, agent_styles, servers):
         except Exception:
             connected = False
         status_emoji = "🟢" if connected else "🔴"
-        st.markdown(f"**Memory DB:** {status_emoji} {'Connected' if connected else 'Disconnected'}")
+        st.markdown(
+            f"**Memory DB:** {status_emoji} {'Connected' if connected else 'Disconnected'}"
+        )
     else:
         st.markdown("**Memory DB:** ⚪ Not configured")
 
@@ -179,7 +204,10 @@ def render_sidebar(orch, agent_styles, servers):
                                 break
                 if quoted:
                     found += 1
-                    with st.expander(f"Quote #{found} — from message: {content.splitlines()[0][:40]}", expanded=False):
+                    with st.expander(
+                        f"Quote #{found} — from message: {content.splitlines()[0][:40]}",
+                        expanded=False,
+                    ):
                         for an, rt in quoted:
                             st.markdown(f"**{an}**: `{rt}`")
                 if found >= 10:
@@ -196,9 +224,13 @@ def render_sidebar(orch, agent_styles, servers):
             st.info("Memory DB not configured — no memories to inspect.")
         else:
             options = ["__group__"] + list(orch.agents.keys())
-            sel = st.selectbox("Show memories for", options, index=0, key="mem_inspector_select")
+            sel = st.selectbox(
+                "Show memories for", options, index=0, key="mem_inspector_select"
+            )
             try:
-                qa_list = db.load_recent_qa(None if sel == "__group__" else sel, limit=10)
+                qa_list = db.load_recent_qa(
+                    None if sel == "__group__" else sel, limit=10
+                )
                 if not qa_list:
                     st.write("No QA entries found.")
                 else:
@@ -211,39 +243,77 @@ def render_sidebar(orch, agent_styles, servers):
 
                 # Export memories for the selected key
                 st.markdown("**Export memories**")
-                out_format = st.selectbox("Format", ["csv", "json"], index=0, key=f"export_format_{sel}")
-                limit = st.number_input("Max rows", min_value=1, max_value=10000, value=100, step=10, key=f"export_limit_{sel}")
+                out_format = st.selectbox(
+                    "Format", ["csv", "json"], index=0, key=f"export_format_{sel}"
+                )
+                limit = st.number_input(
+                    "Max rows",
+                    min_value=1,
+                    max_value=10000,
+                    value=100,
+                    step=10,
+                    key=f"export_limit_{sel}",
+                )
 
                 if st.button("Prepare export", key=f"prepare_export_{sel}"):
                     try:
-                        rows = db.load_recent_qa(None if sel == "__group__" else sel, limit=int(limit))
+                        rows = db.load_recent_qa(
+                            None if sel == "__group__" else sel, limit=int(limit)
+                        )
                         # Normalize
                         normalized = []
                         for r in rows:
                             nr = dict(r)
-                            nr['agent_name'] = (r.get('agent_name') or r.get('agent') or ('__group__' if sel == '__group__' else sel))
+                            nr["agent_name"] = (
+                                r.get("agent_name")
+                                or r.get("agent")
+                                or ("__group__" if sel == "__group__" else sel)
+                            )
                             normalized.append(nr)
 
-                        timestamp = datetime.datetime.utcnow().strftime('%Y%m%dT%H%M%SZ')
+                        timestamp = datetime.datetime.utcnow().strftime(
+                            "%Y%m%dT%H%M%SZ"
+                        )
                         fname = f"{sel}_memories_{timestamp}.{out_format}"
 
-                        if out_format == 'csv':
+                        if out_format == "csv":
                             buf = io.StringIO()
                             writer = csv.writer(buf)
-                            writer.writerow(['agent_name', 'question', 'answer', 'conv_id', 'timestamp'])
+                            writer.writerow(
+                                [
+                                    "agent_name",
+                                    "question",
+                                    "answer",
+                                    "conv_id",
+                                    "timestamp",
+                                ]
+                            )
                             for r in normalized:
-                                writer.writerow([
-                                    r.get('agent_name',''),
-                                    r.get('q') or r.get('question',''),
-                                    r.get('a') or r.get('answer',''),
-                                    r.get('conv_id') or r.get('conv',''),
-                                    r.get('ts') or r.get('timestamp','')
-                                ])
-                            data = buf.getvalue().encode('utf-8')
+                                writer.writerow(
+                                    [
+                                        r.get("agent_name", ""),
+                                        r.get("q") or r.get("question", ""),
+                                        r.get("a") or r.get("answer", ""),
+                                        r.get("conv_id") or r.get("conv", ""),
+                                        r.get("ts") or r.get("timestamp", ""),
+                                    ]
+                                )
+                            data = buf.getvalue().encode("utf-8")
                         else:
-                            data = json.dumps(normalized, default=str, ensure_ascii=False, indent=2).encode('utf-8')
+                            data = json.dumps(
+                                normalized, default=str, ensure_ascii=False, indent=2
+                            ).encode("utf-8")
 
-                        st.download_button("Download export", data, file_name=fname, mime='text/csv' if out_format=='csv' else 'application/json')
+                        st.download_button(
+                            "Download export",
+                            data,
+                            file_name=fname,
+                            mime=(
+                                "text/csv"
+                                if out_format == "csv"
+                                else "application/json"
+                            ),
+                        )
                     except Exception as e:
                         st.error(f"Export failed: {e}")
 
@@ -253,10 +323,11 @@ def render_sidebar(orch, agent_styles, servers):
                     st.session_state[clear_flag_key] = True
 
                 if st.session_state.get(clear_flag_key, False):
-                    st.warning("This will permanently delete memories for the selected entry. This action cannot be undone.")
+                    st.warning(
+                        "This will permanently delete memories for the selected entry. This action cannot be undone."
+                    )
                     if st.button("Confirm delete", key=f"confirm_del_{sel}"):
                         try:
-                            target = None if sel == "__group__" else sel
                             # Use clear_memory with the agent/group key
                             db.clear_memory("__group__" if sel == "__group__" else sel)
                             st.success("Memories cleared.")
@@ -267,7 +338,9 @@ def render_sidebar(orch, agent_styles, servers):
                                 if hasattr(st, "experimental_rerun"):
                                     st.experimental_rerun()
                                 else:
-                                    st.info("Please refresh the page to see the changes.")
+                                    st.info(
+                                        "Please refresh the page to see the changes."
+                                    )
                             except Exception:
                                 st.info("Please refresh the page to see the changes.")
                         except Exception as e:
@@ -278,52 +351,85 @@ def render_sidebar(orch, agent_styles, servers):
     # --- Clear All Memories (destructive) ---
     if db:
         with st.expander("⚠️ Clear All Memories (destructive)", expanded=False):
-            st.write("This will permanently delete all rows from the `agent_memory` table for all agents and group memory.")
+            st.write(
+                "This will permanently delete all rows from the `agent_memory` table for all agents and group memory."
+            )
             st.write("Strongly recommended: export your memories before running this.")
-            export_before = st.checkbox("Export all memories before clearing", value=True, key="export_all_before_clear")
+            export_before = st.checkbox(
+                "Export all memories before clearing",
+                value=True,
+                key="export_all_before_clear",
+            )
 
-            if export_before and st.button("Prepare full export", key="prepare_full_export"):
+            if export_before and st.button(
+                "Prepare full export", key="prepare_full_export"
+            ):
                 try:
                     # Attempt to read all rows from the table
-                    rows = db._try_execute("SELECT agent_name, question, answer, conv_id, timestamp FROM agent_memory ORDER BY timestamp DESC LIMIT 100000", (), fetch=True)
+                    rows = db._try_execute(
+                        "SELECT agent_name, question, answer, conv_id, timestamp FROM agent_memory ORDER BY timestamp DESC LIMIT 100000",
+                        (),
+                        fetch=True,
+                    )
                     if not rows:
                         st.info("No rows found to export.")
                     else:
-                        # Convert to CSV in-memory
-                        import io, csv
+                        # Convert to CSV in-memory (modules imported at module scope)
                         buf = io.StringIO()
                         writer = csv.writer(buf)
-                        writer.writerow(['agent_name', 'question', 'answer', 'conv_id', 'timestamp'])
+                        writer.writerow(
+                            ["agent_name", "question", "answer", "conv_id", "timestamp"]
+                        )
                         for agent_name, q, a, conv_id, ts in rows:
-                            writer.writerow([agent_name or '', q or '', a or '', conv_id or '', ts or ''])
-                        data = buf.getvalue().encode('utf-8')
+                            writer.writerow(
+                                [
+                                    agent_name or "",
+                                    q or "",
+                                    a or "",
+                                    conv_id or "",
+                                    ts or "",
+                                ]
+                            )
+                        data = buf.getvalue().encode("utf-8")
                         fname = f"all_memories_export_{datetime.datetime.utcnow().strftime('%Y%m%dT%H%M%SZ')}.csv"
-                        st.download_button("Download full export", data, file_name=fname, mime='text/csv')
+                        st.download_button(
+                            "Download full export",
+                            data,
+                            file_name=fname,
+                            mime="text/csv",
+                        )
                 except Exception as e:
                     st.error(f"Failed to prepare full export: {e}")
 
-            clear_all_flag = st.session_state.get('confirm_clear_all', False)
+            _clear_all_flag = st.session_state.get("confirm_clear_all", False)
             if st.button("Clear ALL memories (permanent)", key="clear_all_btn"):
-                st.session_state['confirm_clear_all'] = True
+                st.session_state["confirm_clear_all"] = True
 
-            if st.session_state.get('confirm_clear_all', False):
-                st.warning("This will PERMANENTLY delete ALL memories. This action cannot be undone.")
-                confirm_text = st.text_input("Type DELETE ALL to confirm", key="confirm_all_text")
+            if st.session_state.get("confirm_clear_all", False):
+                st.warning(
+                    "This will PERMANENTLY delete ALL memories. This action cannot be undone."
+                )
+                confirm_text = st.text_input(
+                    "Type DELETE ALL to confirm", key="confirm_all_text"
+                )
                 if confirm_text == "DELETE ALL":
                     if st.button("Confirm delete ALL", key="confirm_del_all"):
                         try:
                             db.clear_all()
                             st.success("All memories cleared.")
-                            st.session_state['confirm_clear_all'] = False
+                            st.session_state["confirm_clear_all"] = False
                             try:
                                 if hasattr(st, "experimental_rerun"):
                                     st.experimental_rerun()
                                 else:
-                                    st.info("Please refresh the page to see the changes.")
+                                    st.info(
+                                        "Please refresh the page to see the changes."
+                                    )
                             except Exception:
                                 st.info("Please refresh the page to see the changes.")
                         except Exception as e:
                             st.error(f"Failed to clear all memories: {e}")
                 else:
-                    st.info("Type the exact phrase 'DELETE ALL' to enable the final confirmation button.")
-
+                    st.info(
+                        "Type the exact phrase 'DELETE ALL' to enable the final confirmation button."
+                    )

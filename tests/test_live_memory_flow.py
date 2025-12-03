@@ -1,14 +1,13 @@
 import sys
 import os
-import time
 import uuid
 
 # Ensure project root is importable
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from config import MultiAgentOrchestrator
 from memory import MemoryDB
-import requests
+import requests  # type: ignore[import]
 
 
 class FakeResponse:
@@ -68,7 +67,9 @@ def test_live_memory_flow():
 
         # Verify DB recorded addressed QA with answer
         rows_agent = db.load_recent_qa(agent_name, limit=5)
-        assert any(r.get("q") == q1 and r.get("a") == "Addressed reply" for r in rows_agent)
+        assert any(
+            r.get("q") == q1 and r.get("a") == "Addressed reply" for r in rows_agent
+        )
 
         # Broadcast
         q2 = "Hello all, what's new?"
@@ -77,11 +78,16 @@ def test_live_memory_flow():
 
         # Agent should have another QA row saved with answer
         rows_agent = db.load_recent_qa(agent_name, limit=10)
-        assert any(r.get("q") == q2 and r.get("a") == "Broadcast reply" for r in rows_agent)
+        assert any(
+            r.get("q") == q2 and r.get("a") == "Broadcast reply" for r in rows_agent
+        )
 
         # Group memory should have saved the broadcast question only (empty answer)
         group_rows = db.load_recent_qa(None, limit=5)
-        assert any(r.get("q") == q2 and (r.get("a") == "" or r.get("a") is None) for r in group_rows)
+        assert any(
+            r.get("q") == q2 and (r.get("a") == "" or r.get("a") is None)
+            for r in group_rows
+        )
 
     finally:
         # restore and cleanup
