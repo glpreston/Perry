@@ -1,4 +1,4 @@
-import requests
+import requests  # type: ignore[import]
 
 
 def get_models_for_server(host):

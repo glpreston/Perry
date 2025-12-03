@@ -12,7 +12,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 
 from config import MultiAgentOrchestrator
 from memory import MemoryDB
-import requests
+import requests  # type: ignore[import]
 import time
 import logging
 

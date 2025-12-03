@@ -1,6 +1,6 @@
 import time
 
-import requests
+import requests  # type: ignore[import]
 
 from orchestrator import MultiAgentOrchestrator
 
@@ -19,7 +19,7 @@ def test_circuit_breaker_skips_after_failures(monkeypatch):
 
     monkeypatch.setattr("requests.post", raise_exc)
 
-    replies = orch.chat("hello", messages=None)
+    _replies = orch.chat("hello", messages=None)
     # first call should have a failure recorded
     assert orch.fail_counts.get("TestAgent", 0) >= 1
     assert orch.cooldowns.get("TestAgent", 0) > time.time()

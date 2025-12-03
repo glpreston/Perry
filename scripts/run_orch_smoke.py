@@ -5,7 +5,8 @@ import logging
 sys.path.insert(0, os.path.abspath("."))
 from config import MultiAgentOrchestrator
 from memory import MemoryDB
-import requests
+import requests  # type: ignore[import]
+from typing import Any
 
 
 class FakeResponse:
@@ -17,7 +18,7 @@ class FakeResponse:
         return {"response": self._text}
 
 
-orig_post = requests.post
+orig_post: Any = requests.post
 
 
 def fake_post(url, json=None, timeout=None):
@@ -27,7 +28,7 @@ def fake_post(url, json=None, timeout=None):
     return FakeResponse("(No response)")
 
 
-requests.post = fake_post
+requests.post = fake_post  # type: ignore[assignment]
 
 orch = MultiAgentOrchestrator()
 # ensure DB

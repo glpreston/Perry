@@ -3,7 +3,7 @@
 
 import logging
 import os
-from typing import List, Optional, Tuple
+from typing import Any, List, Optional, Tuple
 
 from dotenv import load_dotenv
 
@@ -25,9 +25,18 @@ class MemoryDB:
         self.user = os.getenv("DB_USER")
         self.password = os.getenv("DB_PASSWORD")
         self.database = os.getenv("DB_NAME")
-        self.conn = None
-        self.cursor = None
+        # Use permissive `Any` for runtime DB connection objects so
+        # inspection scripts and runtime guards don't produce `Any | None`
+        # unions that confuse mypy in guarded code paths.
+        self.conn: Any = None
+        self.cursor: Any = None
         self._connect()
+
+    # compatibility alias expected by some tests
+    def load_memory(
+        self, agent_name: Optional[str] = None, limit: int = 10
+    ) -> List[dict]:
+        return self.load_recent_qa(agent_name, limit=limit)
 
     def _connect(self) -> None:
         if _mysql is None:

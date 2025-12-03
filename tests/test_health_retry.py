@@ -1,4 +1,4 @@
-import requests
+import requests  # type: ignore[import]
 from orchestrator import MultiAgentOrchestrator
 from agents import Agent
 

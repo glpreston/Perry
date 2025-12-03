@@ -374,10 +374,7 @@ def render_sidebar(orch, agent_styles, servers):
                     if not rows:
                         st.info("No rows found to export.")
                     else:
-                        # Convert to CSV in-memory
-                        import io
-                        import csv
-
+                        # Convert to CSV in-memory (modules imported at module scope)
                         buf = io.StringIO()
                         writer = csv.writer(buf)
                         writer.writerow(
@@ -404,7 +401,7 @@ def render_sidebar(orch, agent_styles, servers):
                 except Exception as e:
                     st.error(f"Failed to prepare full export: {e}")
 
-            clear_all_flag = st.session_state.get("confirm_clear_all", False)
+            _clear_all_flag = st.session_state.get("confirm_clear_all", False)
             if st.button("Clear ALL memories (permanent)", key="clear_all_btn"):
                 st.session_state["confirm_clear_all"] = True
 

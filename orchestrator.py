@@ -10,7 +10,7 @@ This implementation supports:
 import json
 import logging
 import re
-import requests
+import requests  # type: ignore[import]
 import uuid
 import time
 from typing import Dict, List, Optional, Tuple
@@ -168,7 +168,8 @@ class MultiAgentOrchestrator:
                         pass
             # if the final outcome looked successful, mark agent ok
             try:
-                if replies.get(name) and not replies.get(name).startswith("("):
+                ans = replies.get(name) or ""
+                if ans and not ans.startswith("("):
                     self.agent_status[name] = "ok"
                     # reset failure counts on success
                     self.fail_counts[name] = 0
@@ -180,8 +181,8 @@ class MultiAgentOrchestrator:
             # persist per-agent QA
             try:
                 if self.memory_db and replies.get(name) is not None:
-                    ans = replies.get(name)
-                    low = (ans or "").lower()
+                    ans = replies.get(name) or ""
+                    low = ans.lower()
                     is_err = ans.startswith("(") and (
                         "timed out" in low or "request error" in low
                     )
@@ -297,16 +298,19 @@ class MultiAgentOrchestrator:
             if self.use_primary_rephrase:
                 try:
                     primary_agent = self.agents.get(target_agent)
-                    if primary_agent:
+                    if primary_agent is None:
+                        # no primary agent available; skip primary rephrase
+                        pass
+                    else:
                         primary_before = replies.get(target_agent, "")
-                    rephrase_parts = [
-                        f"Original question: {original_query}",
-                        f"Your original reply: {primary_before}",
-                        "Other agents replied:",
-                    ]
-                    for cname, _ in chained_calls:
-                        retext = replies.get(cname, "(no reply)")
-                        rephrase_parts.append(f"- {cname}: {retext}")
+                        rephrase_parts: List[str] = [
+                            f"Original question: {original_query}",
+                            f"Your original reply: {primary_before}",
+                            "Other agents replied:",
+                        ]
+                        for cname, _ in chained_calls:
+                            retext = replies.get(cname, "(no reply)")
+                            rephrase_parts.append(f"- {cname}: {retext}")
                     # Strongly instruct the primary agent to produce a predictable quoting format
                     # The response must be in the primary agent's voice and follow this exact structure:
                     # <AgentName>: "<final reply content>"
@@ -344,6 +348,8 @@ class MultiAgentOrchestrator:
                         "stream": False,
                     }
                     try:
+                        # primary_agent is known to be not None here
+                        assert primary_agent is not None
                         rresp = requests.post(
                             f"{primary_agent.host}/api/generate",
                             json=rpayload,
@@ -385,7 +391,7 @@ class MultiAgentOrchestrator:
         if not target_agent and self.use_moderator and self.moderator:
             try:
                 # Build a concise summary prompt containing the question and agent replies
-                summary_parts = [f"Question: {original_query}", "Replies:"]
+                summary_parts: List[str] = [f"Question: {original_query}", "Replies:"]
                 for n, txt in replies.items():
                     summary_parts.append(f"- {n}: {txt}")
                 summary_prompt = "\n".join(summary_parts)
@@ -498,11 +504,11 @@ class MultiAgentOrchestrator:
         cfg = {
             "servers": self.servers,
             "agent_styles": self.agent_styles,
-            "agents": [],
             "use_moderator": self.use_moderator,
             "moderator": {"server": None, "model": None, "persona": None},
         }
 
+        agents_list: List[dict] = []
         for name, agent in self.agents.items():
             if name == "Moderator":
                 continue
@@ -511,7 +517,7 @@ class MultiAgentOrchestrator:
                 if v == agent.host:
                     server_name = k
                     break
-            cfg["agents"].append(
+            agents_list.append(
                 {
                     "name": agent.name,
                     "server": server_name or agent.host,
@@ -519,6 +525,8 @@ class MultiAgentOrchestrator:
                     "persona": agent.persona,
                 }
             )
+
+        cfg["agents"] = agents_list
 
         if self.moderator:
             server_name = None

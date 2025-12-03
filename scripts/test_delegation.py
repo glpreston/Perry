@@ -17,7 +17,7 @@ ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
-from orchestrator import MultiAgentOrchestrator
+from orchestrator import MultiAgentOrchestrator  # noqa: E402
 
 
 def main():
