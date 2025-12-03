@@ -64,6 +64,14 @@ class MemoryDB:
             self.cursor.execute(sql, params)
             if fetch:
                 return self.cursor.fetchall()
+            # For write operations ensure we commit so CI (non-autocommit
+            # connections) persist changes between statements.
+            try:
+                if self.conn and getattr(self.conn, "commit", None):
+                    self.conn.commit()
+            except Exception:
+                # commit is best-effort; log and continue
+                self.log.debug("MemoryDB commit failed", exc_info=True)
             return None
         except Exception as e:
             self.log.warning("MemoryDB exec error: %s", e)
